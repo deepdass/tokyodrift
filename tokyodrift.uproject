@@ -18,6 +18,14 @@
 		{
 			"Name": "ChaosVehiclesPlugin",
 			"Enabled": true
+		},
+		{
+			"Name": "WakaTimeForUE",
+			"Enabled": false
+		},
+		{
+			"Name": "WakatimeIntegration",
+			"Enabled": true
 		}
 	]
 }
