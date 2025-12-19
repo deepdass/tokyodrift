@@ -24,11 +24,12 @@ public class WakatimeIntegration : ModuleRules
 				"Engine",
 				"UnrealEd",
 				"AssetRegistry",
-				"Http",
+				"HTTP",
 				"Json",
 				"JsonUtilities",
-				"DeveloperSettings"
-			}
+				"DeveloperSettings",
+                
+            }
 			);
 	}
 }

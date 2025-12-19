@@ -2,7 +2,6 @@
 
 #include "WakatimeIntegration.h"
 #include "Modules/ModuleManager.h"
-
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "UObject/UObjectGlobals.h"
 #include "HttpModule.h"
@@ -18,15 +17,24 @@
 
 #define LOCTEXT_NAMESPACE "FWakatimeIntegrationModule"
 
-
 IMPLEMENT_MODULE(FWakatimeIntegrationModule, WakatimeIntegration)
 
 void FWakatimeIntegrationModule::StartupModule()
 {
+	Dirty = false;
+	DeleteOperations = 0;
+	SaveOperations = 0;
+	RenameOperations = 0;
+	AddOperations = 0;
+	LastAssetPushTime = -1;
+	LastActivityTime = 0;
+	SaveDebounce = 2;
+	LastSavedName = FName(TEXT("None"));
+
 	if (ISettingsModule* SettingsModule = FModuleManager::GetModulePtr<ISettingsModule>("Settings")) {
 		SettingsModule->RegisterSettings("Editor", "Plugins", "Wakatime_Settings",
-			NSLOCTEXT("WakatimeIntegration", "WakatimeSettingsDisplayName", "Hackatime Integration"),
-			NSLOCTEXT("WakatimeIntegration", "WakatimeSettingsDescription", "Settings for Hackatime Integration plugin"),
+			NSLOCTEXT("WakatimeIntegration", "WakatimeSettingsDisplayName", "Wakatime Integration"),
+			NSLOCTEXT("WakatimeIntegration", "WakatimeSettingsDescription", "Settings for Wakatime-compatible time tracking"),
 			GetMutableDefault<UWakatimeSettings>());
 	}
 
@@ -37,14 +45,16 @@ void FWakatimeIntegrationModule::StartupModule()
 	AssetRegistry.OnAssetAdded().AddRaw(this, &FWakatimeIntegrationModule::OnAssetAdded);
 	AssetRegistry.OnAssetRemoved().AddRaw(this, &FWakatimeIntegrationModule::OnAssetRemoved);
 	AssetRegistry.OnAssetRenamed().AddRaw(this, &FWakatimeIntegrationModule::OnAssetRenamed);
+
 	FCoreUObjectDelegates::OnObjectSaved.AddRaw(this, &FWakatimeIntegrationModule::OnObjectSaved);
+	FCoreUObjectDelegates::OnObjectModified.AddRaw(this, &FWakatimeIntegrationModule::OnObjectModified);
 
 	TimerHandle = FTSTicker::GetCoreTicker().AddTicker(
 		FTickerDelegate::CreateRaw(this, &FWakatimeIntegrationModule::OnTimerTick),
 		TimerDuration
 	);
 
-	UE_LOG(LogTemp, Log, TEXT("Hackatime Integration Startup - UE 5.5.4"));
+	UE_LOG(LogTemp, Log, TEXT("Wakatime Integration Startup"));
 }
 
 void FWakatimeIntegrationModule::ShutdownModule()
@@ -63,10 +73,19 @@ void FWakatimeIntegrationModule::ShutdownModule()
 	}
 
 	FCoreUObjectDelegates::OnObjectSaved.RemoveAll(this);
+	FCoreUObjectDelegates::OnObjectModified.RemoveAll(this);
 
 	FTSTicker::GetCoreTicker().RemoveTicker(TimerHandle);
 
-	UE_LOG(LogTemp, Log, TEXT("Hackatime Integration Shutdown"));
+	UE_LOG(LogTemp, Log, TEXT("Wakatime Integration Shutdown"));
+}
+
+void FWakatimeIntegrationModule::MarkActivity()
+{
+	int64 now = GetCurrentTime();
+	FScopeLock Lock(&DataLock);
+	Dirty = true;
+	LastActivityTime = now;
 }
 
 void FWakatimeIntegrationModule::OnAssetAdded(const FAssetData& AssetData)
@@ -77,8 +96,13 @@ void FWakatimeIntegrationModule::OnAssetAdded(const FAssetData& AssetData)
 	}
 	LastAssetPushTime = now;
 
-	Dirty = true;
-	AddOperations++;
+	{
+		FScopeLock Lock(&DataLock);
+		Dirty = true;
+		AddOperations++;
+		LastActivityTime = now;
+	}
+	SendHeartbeat();
 }
 
 void FWakatimeIntegrationModule::OnAssetRemoved(const FAssetData& AssetData)
@@ -89,8 +113,13 @@ void FWakatimeIntegrationModule::OnAssetRemoved(const FAssetData& AssetData)
 	}
 	LastAssetPushTime = now;
 
-	Dirty = true;
-	DeleteOperations++;
+	{
+		FScopeLock Lock(&DataLock);
+		Dirty = true;
+		DeleteOperations++;
+		LastActivityTime = now;
+	}
+	SendHeartbeat();
 }
 
 void FWakatimeIntegrationModule::OnAssetRenamed(const FAssetData& AssetData, const FString& OldPath)
@@ -101,8 +130,13 @@ void FWakatimeIntegrationModule::OnAssetRenamed(const FAssetData& AssetData, con
 	}
 	LastAssetPushTime = now;
 
-	Dirty = true;
-	RenameOperations++;
+	{
+		FScopeLock Lock(&DataLock);
+		Dirty = true;
+		RenameOperations++;
+		LastActivityTime = now;
+	}
+	SendHeartbeat();
 }
 
 void FWakatimeIntegrationModule::OnObjectSaved(UObject* SavedObject)
@@ -113,9 +147,19 @@ void FWakatimeIntegrationModule::OnObjectSaved(UObject* SavedObject)
 	}
 	LastAssetPushTime = now;
 
-	SaveOperations++;
-	Dirty = true;
-	LastSavedName = SavedObject->GetFName();
+	{
+		FScopeLock Lock(&DataLock);
+		SaveOperations++;
+		Dirty = true;
+		LastSavedName = SavedObject->GetFName();
+		LastActivityTime = now;
+	}
+	SendHeartbeat();
+}
+
+void FWakatimeIntegrationModule::OnObjectModified(UObject* ModifiedObject)
+{
+	MarkActivity();
 }
 
 FString GetCurrentOSName()
@@ -137,6 +181,22 @@ FString GetCurrentOSName()
 
 bool FWakatimeIntegrationModule::OnTimerTick(float DeltaTime)
 {
+	int64 now = GetCurrentTime();
+	const UWakatimeSettings* Settings = GetDefault<UWakatimeSettings>();
+	if (!Settings) {
+		return true;
+	}
+
+	int64 activityTimeout = 120;
+	bool hasRecentActivity = false;
+	{
+		FScopeLock Lock(&DataLock);
+		hasRecentActivity = (now - LastActivityTime) < activityTimeout;
+		if (hasRecentActivity) {
+			Dirty = true;
+		}
+	}
+
 	SendHeartbeat();
 	return true;
 }
@@ -177,7 +237,8 @@ void FWakatimeIntegrationModule::SendHeartbeat()
 
 	FString Endpoint = Settings->WakatimeEndpoint;
 	if (Endpoint.IsEmpty()) {
-		Endpoint = TEXT("https://waka.hackclub.com/api");
+		Endpoint = TEXT("https://api.wakatime.com/api/v1");
+		UE_LOG(LogTemp, Warning, TEXT("Wakatime Integration: No endpoint configured, using default Wakatime API"));
 	}
 	if (Endpoint.EndsWith(TEXT("/")))
 	{
@@ -197,12 +258,11 @@ void FWakatimeIntegrationModule::SendHeartbeat()
 
 	FString TargetURL = Endpoint + TEXT("/users/current/heartbeats");
 
-	// Build JSON body for Hackatime API
 	FString Body = FString::Printf(
 		TEXT(
 			"{\"type\":\"file\",\"time\":%lld,\"project\":\"%s\",\"entity\":\"%s\","
 			"\"language\":\"UnrealEngine\",\"is_write\":%s,"
-			"\"editor\":\"Unreal Engine\",\"plugin\":\"unreal-wakatime\","
+			"\"editor\":\"Unreal Engine\",\"plugin\":\"unreal-wakatime/%s\","
 			"\"operating_system\":\"%s\",\"machine\":\"%s\","
 			"\"lines\":%d,\"lineno\":1,\"cursorpos\":0}"
 		),
@@ -210,6 +270,7 @@ void FWakatimeIntegrationModule::SendHeartbeat()
 		*ProjectName,
 		*EntityName,
 		(localSaveOperations > 0) ? TEXT("true") : TEXT("false"),
+		*EngineVersionString,
 		*OSName,
 		*ComputerName,
 		localAddOperations + localSaveOperations
@@ -245,7 +306,7 @@ void FWakatimeIntegrationModule::OnHttpResponse(FHttpRequestPtr Request, FHttpRe
 {
 	if (!bWasSuccessful || !Response.IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("Hackatime Integration: Failed to establish connection to Hackatime endpoint."));
+		UE_LOG(LogTemp, Error, TEXT("Wakatime Integration: Failed to establish connection to endpoint."));
 		return;
 	}
 
@@ -253,15 +314,15 @@ void FWakatimeIntegrationModule::OnHttpResponse(FHttpRequestPtr Request, FHttpRe
 	FString ResponseString = Response->GetContentAsString();
 
 	if (ResponseCode >= 200 && ResponseCode < 300) {
-		UE_LOG(LogTemp, Log, TEXT("Hackatime Integration: Heartbeat accepted with code %d"), ResponseCode);
+		UE_LOG(LogTemp, Log, TEXT("Wakatime Integration: Heartbeat accepted with code %d"), ResponseCode);
 	}
 	else if (ResponseCode == 401)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Hackatime Integration: Heartbeat failed due to invalid API token (401). Response: %s"), *ResponseString);
+		UE_LOG(LogTemp, Error, TEXT("Wakatime Integration: Heartbeat failed due to invalid API token (401). Response: %s"), *ResponseString);
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("Hackatime Integration: Heartbeat failed. Code: %d. Response: %s"), ResponseCode, *ResponseString);
+		UE_LOG(LogTemp, Error, TEXT("Wakatime Integration: Heartbeat failed. Code: %d. Response: %s"), ResponseCode, *ResponseString);
 	}
 }
 

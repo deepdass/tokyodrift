@@ -27,7 +27,14 @@ private:
 	void OnAssetRemoved(const FAssetData& AssetData);
 	void OnAssetRenamed(const FAssetData& AssetData, const FString& OldPath);
 	void OnObjectSaved(UObject* SavedObject);
+	void OnObjectModified(UObject* ModifiedObject);
+	void MarkActivity();
 	void SendHeartbeat();
+	void FetchTodayStats();
+	void OnStatsHttpResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
+	void RegisterToolbarExtension();
+	TSharedRef<SWidget> GenerateToolbarWidget();
+	FText GetTodayTimeText() const;
 	int64 GetCurrentTime();
 	void OnHttpResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
 
@@ -38,7 +45,12 @@ private:
 	int32 RenameOperations = 0;
 	int32 AddOperations = 0;
 	int64 LastAssetPushTime = -1;
+	int64 LastActivityTime = 0;
 	int64 SaveDebounce = 2;
 	FName LastSavedName = FName(TEXT("None"));
 	FTSTicker::FDelegateHandle TimerHandle;
+	FTSTicker::FDelegateHandle StatsTimerHandle;
+
+	FString TodayTimeFormatted = TEXT("--:--");
+	TSharedPtr<class FUICommandList> PluginCommands;
 };
