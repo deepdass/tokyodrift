@@ -26,12 +26,13 @@
 		{
 			"Name": "WakatimeIntegration",
 			"Enabled": true
+		},
+		{
+			"Name": "Fab",
+			"Enabled": false
 		}
 	],
 	"TargetPlatforms": [
-		"Linux",
-		"LinuxArm64",
-		"Mac",
 		"Windows"
 	]
 }
