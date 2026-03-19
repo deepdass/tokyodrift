@@ -1,8 +1,16 @@
-game made for Hack club Milkyway
-I made this after coming for tokyo, where i saw so many cool cars, and wanted to make a game about them and given that drifting was invented in japan so 
+# Tokyo Drift
+A drifting game inspired by Japanese car culture
 
-whats next - will add a neon city like Tokyo and more advance sroring system like additional point on the bases of how much closer you were to a collidable object, this will pair nicely with the current scoring system thats based on the tilt of the car with its forward vector but have to make the neon map first, also add more playable cars with different properties like torque curve, transmission etc
+## Why 
+I made this after coming for tokyo, where i saw so many cool cars, and wanted to make a game about them and given that drifting was invented in japan, so I wanted to create a game centered around drifting mechanics
 
-![image alt](https://github.com/deepdass/tokyodrift/blob/328e5cffcb6ad82d6f721fd9308605eca9796dd7/readme_images/zPAIdq.png)
+[![Watch the video](https://img.youtube.com/vi/-IfPtmApisE/maxresdefault.jpg)](https://youtu.be/-IfPtmApisE)
+[Watch this video - Drift Physics demo](https://youtu.be/-IfPtmApisE)
 
-![image alt](https://github.com/deepdass/tokyodrift/blob/328e5cffcb6ad82d6f721fd9308605eca9796dd7/readme_images/rbA3OP.png)
+<img width="1924" height="1084" alt="HighresScreenshot" src="https://github.com/user-attachments/assets/913cd90f-0a62-48ac-8ec7-e1f3d42dfbd6" />
+
+
+## whats next 
+- will add a neon city like Tokyo 
+- more advance sroring system like additional point on the bases of how much closer you were to a collidable object, this will pair nicely with the current scoring system thats based on the tilt of the car with its forward vector but have to make the neon map first 
+- add more playable cars with different properties like torque curve, transmission etc
