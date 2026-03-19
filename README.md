@@ -9,6 +9,11 @@ I made this after coming for tokyo, where i saw so many cool cars, and wanted to
 
 <img width="1924" height="1084" alt="HighresScreenshot" src="https://github.com/user-attachments/assets/913cd90f-0a62-48ac-8ec7-e1f3d42dfbd6" />
 
+## Controls
+- WASD - Move
+- Space - Brake
+- R - Reload Level
+- K - Quit Game
 
 ## whats next 
 - will add a neon city like Tokyo 
