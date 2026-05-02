@@ -2,7 +2,7 @@
 A drifting game inspired by Japanese car culture
 
 ## Why 
-I made this after coming for tokyo, where i saw so many cool cars, and wanted to make a game about them and given that drifting originated in japan, so I wanted to create a game centered around drifting mechanics
+I made this after coming from tokyo, where i saw so many cool cars, and wanted to make a game about them and given that drifting originated in japan, so I wanted to create a game centered around drifting mechanics
 <br>Also, before this I wanted to make a drifting game to see how I could make smooth drifting physics and how cars actually work. The drifting physics took a lot of iterations to make it feel right and to make it behave how a actual car would, I tried to have the car properties similar to their real like counterparts
 
 [![Watch the video](https://img.youtube.com/vi/-IfPtmApisE/maxresdefault.jpg)](https://youtu.be/-IfPtmApisE)
